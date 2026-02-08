@@ -186,7 +186,6 @@ JSON格式：
         score += self._score_benchmark_data(analysis_data["benchmark_data"]) * weights["benchmark"]
         score += self._score_leadership(analysis_data["leadership_analysis"]) * weights["leadership"]
         score += self._score_business_value(analysis_data["business_analysis"]) * weights["business"]
-        score += self._score_risk(analysis_data["risk_assessment"]) * weights["risk"]
 
         return max(0.0, min(score, 1.0))
 
