@@ -28,10 +28,10 @@ class AICompanyAnalyzer:
         
         # 主要AI公司列表
         self.target_companies = [
-            "OpenAI (Chatgpt)", "Google (Gemini)",
-            "Anthropic (Claude)", "DeepSeek", 
-            "字节跳动 (Doubao)", "Alibaba (Qwen)", "Meituan",
-            "xAI", "Mistral", "百度 (文心一言)"
+            "OpenAI", "Google",
+            "Anthropic", "DeepSeek", 
+            "字节跳动", "Alibaba", "Meituan",
+            "xAI", "Mistral", "百度"
         ]
 
     
@@ -55,12 +55,12 @@ class AICompanyAnalyzer:
         try:
             
                 # 使用API收集数据
+            company = self.api_wrapper.get_newest_model_info(company)
+            print("company", company)
             analysis_data["benchmark_data"] = self.api_wrapper.collect_arena_benchmark_data(company)
             analysis_data["leadership_analysis"] = self.api_wrapper.analyze_leadership_persistence(company)
-            # analysis_data["risk_assessment"] = self.api_wrapper.assess_risks(company)
             analysis_data["business_analysis"] = self.api_wrapper.analyze_business_value(company)
             
-            # 将API收集的数据传递给本地LLM进行综合评分
             analysis_data["final_score"] = self.analyze_with_local_llm(analysis_data)
 
             print("analysis_data", analysis_data)
@@ -70,47 +70,15 @@ class AICompanyAnalyzer:
         
         return analysis_data
     
+    
     def analyze_with_local_llm(self, analysis_data: Dict[str, Any]) -> float:
         """
         使用外部API（通义千问）对API数据做综合分析并返回0~1的得分
         """
-        company = analysis_data["company"]
-        
-        # 构建LLM提示词
-        template = """你是一个专业的AI投资分析师，你需要预测截至在{time}前
-Chatbot Arena榜单上第一的AI模型更可能来自哪个公司。
+        company = analysis_data["company"]  
 
-请基于以下四个维度的数据，对 {company} 进行综合评分（0-100分）：
-
-基准表现数据:
-{benchmark_data}
-
-领导地位分析:
-{leadership_data}
-
-商业价值分析:
-{business_data}
-
-评分标准:
-1. 技术实力和基准测试表现 (40%)
-2. 市场竞争力和领导者地位 (30%)
-3. 商业价值和盈利能力 (20%)
-
-注意：
-- 请只输出一个JSON对象
-- 不要输出解释性文字
-- 不要使用```json```代码块
-
-JSON格式：
-{{
-"score": 0-100,
-"reasoning": "评分理由",
-"strengths": "主要优势",
-"weaknesses": "潜在风险"
-}}
-"""
-
-        prompt = f"""你是一个专业的AI投资分析师，需要基于以下数据对{company}进行综合评分（0-100分）：
+        time = datetime.now().strftime("%Y-%m-%d")
+        prompt = f"""需要基于以下数据对{company}进行综合评分（0-100分）：
 
 基准表现数据:
 {safe_json_dump(analysis_data.get("benchmark_data", {}))}
@@ -121,12 +89,17 @@ JSON格式：
 商业价值分析:
 {safe_json_dump(analysis_data.get("business_analysis", {}))}
 
-请严格按照以下JSON格式输出，只输出JSON对象，不要有其他文字：
+
+注意：
+- 请只输出一个JSON对象
+- 不要输出解释性文字
+- 不要使用```json```代码块
+
 {{
 "score": 分数值（0-100）,
 "reasoning": "评分理由",
 "strengths": "主要优势",
-"weaknesses": "潜在风险"
+"weaknesses": "主要风险"
 }}"""
 
         try:
@@ -143,7 +116,7 @@ JSON格式：
                 messages=[
                     {
                         "role": "system", 
-                        "content": "你是一个专业的AI投资分析师，需要基于提供的商业数据对AI公司进行评分。请严格按要求格式输出JSON。"
+                        "content": "你是一个专业的AI投资分析师，你需要通过评分预测截至在{time}前, Chatbot Arena榜单上第一的AI模型更可能来自哪个公司。需要基于给出的数据对{company}进行综合评分（0-100分）。\n\n"
                     },
                     {
                         "role": "user",
@@ -151,7 +124,7 @@ JSON格式：
                     }
                 ],
                 extra_body={
-                    "enable_search": True   # 为true是支持联网
+                    "enable_search": True 
                 },
                 temperature=0.3,
                 max_tokens=2000
@@ -179,18 +152,15 @@ JSON格式：
         规则兜底综合评分（0~1）
         """
         weights = {
-            "benchmark": 0.4,
+            "benchmark": 0.5,
             "leadership": 0.3,
-            "business": 0.2,
-            "risk": 0.1,   # 修复：风险应占 10%
+            "business": 0.1,
         }
 
         score = 0.0
         score += self._score_benchmark_data(analysis_data["benchmark_data"]) * weights["benchmark"]
         score += self._score_leadership(analysis_data["leadership_analysis"]) * weights["leadership"]
         score += self._score_business_value(analysis_data["business_analysis"]) * weights["business"]
-        score += self._score_risk(analysis_data["risk_assessment"]) * weights["risk"]
-
         return max(0.0, min(score, 1.0))
 
     

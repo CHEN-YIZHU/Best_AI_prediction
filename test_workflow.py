@@ -14,7 +14,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument(
         "--companies",
         nargs="+",
-        default=["OpenAI (GPT系列)", "Google (Gemini)", "Anthropic (Claude)"],
+        default=["OpenAI", "Google", "Anthropic"],
         help="要分析的公司列表（空格分隔）",
     )
     p.add_argument("--max-workers", type=int, default=1, help="并发线程数（建议先用1跑通）")
