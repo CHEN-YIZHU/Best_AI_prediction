@@ -14,3 +14,8 @@ tqdm>=4.67.3
 # 注释：以下库是Python标准库，不需要额外安装
 # concurrent.futures (Python标准库)
 # typing (Python标准库)
+
+# 其他依赖
+Pillow
+PyYAML
+python-dotenv

@@ -13,14 +13,25 @@
 
 ## 快速启动API服务
 
+1. 安装依赖
 ```bash
-cd Best_AI_prediction
-bash scripts/start_api.sh
+pip install -r requirements_api.txt
+```
+
+2. 启动服务
+```bash
+# 从项目根目录启动
+python -m api.api_server --reload
 ```
 
 ## 结果获取
 
-### 1. Python示例
+### 1. 使用一键测试脚本 (推荐)
+```bash
+python call_api.py
+```
+
+### 2. Python手动调用示例
 ```python
 import requests
 
@@ -32,10 +43,14 @@ response = requests.post("http://localhost:8000/analyze", json={
 
 # 获取任务ID并查询结果
 task_id = response.json()["task_id"]
+print(f"Task ID: {task_id}")
+
+# ... (稍后查询)
 results = requests.get(f"http://localhost:8000/results/{task_id}").json()
+print(results)
 ```
 
-### 2. 使用示例脚本
+### 3. 使用原有脚本
 ```bash
 # 需要修改api key
 bash scripts/fetch_result.sh

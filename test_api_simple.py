@@ -6,6 +6,12 @@
 import os
 import json
 import requests
+from dotenv import load_dotenv
+
+# 加载环境变量
+load_dotenv()
+import json
+import requests
 
 def test_dashscope_api():
     """测试DashScope API连通性"""

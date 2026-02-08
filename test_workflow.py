@@ -3,6 +3,10 @@ import json
 import logging
 import os
 from typing import List
+from dotenv import load_dotenv
+
+# 加载环境变量
+load_dotenv()
 
 from engine_analysis import AICompanyAnalyzer
 

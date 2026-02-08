@@ -9,6 +9,10 @@ from pydantic import BaseModel, Field
 import uvicorn
 from datetime import datetime
 import uuid
+from dotenv import load_dotenv
+
+# 加载环境变量
+load_dotenv()
 
 from engine_analysis import AICompanyAnalyzer
 
@@ -289,7 +293,7 @@ def main():
     print(f"文档: http://{args.host}:{args.port}/docs")
     
     uvicorn.run(
-        "api_server:app",
+        "api.api_server:app",
         host=args.host,
         port=args.port,
         reload=args.reload,
