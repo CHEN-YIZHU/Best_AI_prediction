@@ -37,6 +37,7 @@ results = requests.get(f"http://localhost:8000/results/{task_id}").json()
 
 ### 2. 使用示例脚本
 ```bash
+# 需要修改api key
 bash scripts/fetch_result.sh
 ```
 
