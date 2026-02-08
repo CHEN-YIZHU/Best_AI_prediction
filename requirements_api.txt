@@ -1,0 +1,16 @@
+
+# FastAPI相关依赖
+fastapi>=0.104.0
+uvicorn>=0.24.0
+pydantic>=2.0.0
+python-multipart>=0.0.6
+
+# 代码分析核心依赖
+openai>=2.17.0
+pandas>=2.3.2
+requests>=2.32.5
+tqdm>=4.67.3
+
+# 注释：以下库是Python标准库，不需要额外安装
+# concurrent.futures (Python标准库)
+# typing (Python标准库)

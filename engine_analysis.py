@@ -47,7 +47,7 @@ class AICompanyAnalyzer:
             "analysis_method": "api",
             "benchmark_data": {},
             "leadership_analysis": {},
-            "risk_assessment": {},
+            # "risk_assessment": {},
             "business_analysis": {},
             "final_score": 0.0
         }
@@ -57,7 +57,7 @@ class AICompanyAnalyzer:
                 # 使用API收集数据
             analysis_data["benchmark_data"] = self.api_wrapper.collect_arena_benchmark_data(company)
             analysis_data["leadership_analysis"] = self.api_wrapper.analyze_leadership_persistence(company)
-            analysis_data["risk_assessment"] = self.api_wrapper.assess_risks(company)
+            # analysis_data["risk_assessment"] = self.api_wrapper.assess_risks(company)
             analysis_data["business_analysis"] = self.api_wrapper.analyze_business_value(company)
             
             # 将API收集的数据传递给本地LLM进行综合评分
@@ -88,9 +88,6 @@ Chatbot Arena榜单上第一的AI模型更可能来自哪个公司。
 领导地位分析:
 {leadership_data}
 
-风险评估:
-{risk_data}
-
 商业价值分析:
 {business_data}
 
@@ -98,7 +95,6 @@ Chatbot Arena榜单上第一的AI模型更可能来自哪个公司。
 1. 技术实力和基准测试表现 (40%)
 2. 市场竞争力和领导者地位 (30%)
 3. 商业价值和盈利能力 (20%)
-4. 风险管控和合规性 (10%)
 
 注意：
 - 请只输出一个JSON对象
@@ -121,9 +117,6 @@ JSON格式：
 
 领导地位分析:
 {safe_json_dump(analysis_data.get("leadership_analysis", {}))}
-
-风险评估:
-{safe_json_dump(analysis_data.get("risk_assessment", {}))}
 
 商业价值分析:
 {safe_json_dump(analysis_data.get("business_analysis", {}))}

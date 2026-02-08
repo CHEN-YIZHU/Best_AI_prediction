@@ -147,15 +147,15 @@ class ModelAPIWrapper:
             }
 
     def collect_arena_benchmark_data(self, company: str) -> Dict[str, Any]:
-        as_of = datetime.utcnow().strftime("%Y-%m-%d")
+        
         prompt = f"""
-        你是“事实核验优先”的数据采集员。目标：收集截至 {as_of} 的公开最新数据，关于 {company} 的模型在 Chatbot Arena（LMSYS / lmarena）及常见基准上的表现。
+        你是“事实核验优先”的数据采集员。目标：收集公开最新数据，关于 {company} 的模型在 Chatbot Arena（LMSYS / lmarena）及常见基准上的表现。
 
         【硬性规则（必须遵守）】
         1) 只输出一个严格合法的 JSON（双引号、无尾逗号、无注释、无 markdown、无 ``` 代码块），不要输出任何额外文本。
         2) 任何“数值/排名/日期/发布信息/结论”都必须给出可核验来源 source_url（真实可打开的网页/论文/官方公告链接）与 source_date（该来源页面或公告日期；不确定则为 null）。
         3) 如果你无法提供真实且可核验的 source_url，则对应数值必须设为 null，并在 missing_fields 中列出该字段路径；严禁编造链接、编造分数、编造排名。
-        4) “最新”以 as_of 为截止：优先使用官方网站/榜单页/论文原文/官方博客；其次才用媒体报道。来源不一致时，保留冲突并标注 conflict=true。
+        4) 优先使用官方网站/榜单页/论文原文/官方博客；其次才用媒体报道。来源不一致时，保留冲突并标注 conflict=true。
 
         【你需要覆盖的信息】
         - {company} 相关的“公开可用聊天模型/旗舰模型”列表（尽量包含版本/发布日期）
@@ -166,7 +166,6 @@ class ModelAPIWrapper:
         【输出 JSON 结构（必须严格遵循字段名；可填 null，但不要新增顶层字段）】
         {{
         "company": "{company}",
-        "as_of": "{as_of}",
         "sources": [
             {{
             "name": "LMSYS / Chatbot Arena (or lmarena)",
@@ -232,18 +231,18 @@ class ModelAPIWrapper:
 """
         return self.call_json(prompt, api_type="qwen")
 
-    def assess_risks(self, company: str) -> Dict[str, Any]:
-        prompt = f"""评估{company}面临的法律、伦理、监管风险。
-【输出要求】只输出严格 JSON，不要额外文本/markdown。
-{{
-  "legal_challenges": "...",
-  "ethical_issues": "...",
-  "contract_risks": "...",
-  "impact_on_commercialization": "...",
-  "risk_management": "..."
-}}
-"""
-        return self.call_json(prompt, api_type="qwen")
+#     def assess_risks(self, company: str) -> Dict[str, Any]:
+#         prompt = f"""评估{company}面临的法律、伦理、监管风险。
+# 【输出要求】只输出严格 JSON，不要额外文本/markdown。
+# {{
+#   "legal_challenges": "...",
+#   "ethical_issues": "...",
+#   "contract_risks": "...",
+#   "impact_on_commercialization": "...",
+#   "risk_management": "..."
+# }}
+# """
+#         return self.call_json(prompt, api_type="qwen")
 
     def analyze_business_value(self, company: str) -> Dict[str, Any]:
         prompt = f"""分析{company}AI模型质量与商业价值的关系。

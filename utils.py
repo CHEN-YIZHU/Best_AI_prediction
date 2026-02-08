@@ -1,37 +1,33 @@
 import random
 import requests
 import json
-from typing import Dict, Any, Optional
-from utils import RequestWrapperOne
-
-import json
 import re
-
+from typing import Dict, Any, Optional
 from datetime import datetime
 
-from vllm import LLM, SamplingParams
+# from vllm import LLM, SamplingParams
 
 
-def prepare_model(model_path, max_model_len=2048, tp_size=8):
-    llm = LLM(
-        model=model_path,
-        tokenizer=model_path,
-        max_model_len=max_model_len,
-        trust_remote_code=True,
-        tensor_parallel_size=tp_size,   # 关键
-    )
-    return llm
+# def prepare_model(model_path, max_model_len=2048, tp_size=8):
+#     llm = LLM(
+#         model=model_path,
+#         tokenizer=model_path,
+#         max_model_len=max_model_len,
+#         trust_remote_code=True,
+#         tensor_parallel_size=tp_size,   # 关键
+#     )
+#     return llm
 
 
-def build_sampling_params(max_tokens=1024, temperature=1.0, top_p=1.0):
-    # Qwen 常见的 stop token ids（你原来给的保持不变）
-    stop_token_ids = [151329, 151336, 151338]
-    return SamplingParams(
-        temperature=temperature,
-        top_p=top_p,
-        max_tokens=max_tokens,
-        stop_token_ids=stop_token_ids,
-    )
+# def build_sampling_params(max_tokens=1024, temperature=1.0, top_p=1.0):
+#     # Qwen 常见的 stop token ids（你原来给的保持不变）
+#     stop_token_ids = [151329, 151336, 151338]
+#     return SamplingParams(
+#         temperature=temperature,
+#         top_p=top_p,
+#         max_tokens=max_tokens,
+#         stop_token_ids=stop_token_ids,
+#     )
 
 def normalize_score(score_val: Any) -> float:
     """

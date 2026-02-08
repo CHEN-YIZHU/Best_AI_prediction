@@ -14,7 +14,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument(
         "--companies",
         nargs="+",
-        default=["Google", "OpenAI", "Qwen"],
+        default=["OpenAI (GPT系列)", "Google (Gemini)", "Anthropic (Claude)"],
         help="要分析的公司列表（空格分隔）",
     )
     p.add_argument("--max-workers", type=int, default=1, help="并发线程数（建议先用1跑通）")
@@ -68,14 +68,14 @@ def main():
     analyser = AICompanyAnalyzer(args)
 
     # 覆盖公司列表
-    analyser.target_companies = args.companies
+    # analyser.target_companies = args.companies
 
     results = analyser.analyze_all_companies(
         max_workers=args.max_workers,
     )
 
-    print("\n===== RAW RESULTS =====")
-    print(json.dumps(results, ensure_ascii=False, indent=2))
+    # print("\n===== RAW RESULTS =====")
+    # print(json.dumps(results, ensure_ascii=False, indent=2))
 
     # 可选：输出简单总结（如果你的 generate_summary_report 可用）
     try:
