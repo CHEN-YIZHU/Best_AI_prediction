@@ -5,41 +5,15 @@ import random
 import re
 import requests
 from typing import Any, Dict, List, Optional
-from datetime import datetime
 from time import sleep
-from concurrent.futures import ThreadPoolExecutor
-from tqdm import tqdm
 
-_JSON_FENCE_RE = re.compile(r"```(?:json)?\s*([\s\S]*?)\s*```", re.IGNORECASE)
-
-def _strip_code_fence(text: str) -> str:
-    """如果模型把 JSON 放在 ```json ...``` 里，提取出来。"""
-    if not isinstance(text, str):
-        return str(text)
-    m = _JSON_FENCE_RE.search(text)
-    return (m.group(1).strip() if m else text.strip())
-
-def _extract_json_candidate(text: str) -> str:
-    """
-    尝试从文本中截取 JSON 片段：
-    - 优先截取最外层 {...}
-    - 否则截取最外层 [...]
-    - 都找不到就返回原文本
-    """
-    t = _strip_code_fence(text)
-    s = t.find("{")
-    e = t.rfind("}")
-    if 0 <= s < e:
-        return t[s : e + 1].strip()
-    s = t.find("[")
-    e = t.rfind("]")
-    if 0 <= s < e:
-        return t[s : e + 1].strip()
-    return t.strip()
-
-def _remove_trailing_commas(s: str) -> str:
-    """去掉 JSON 常见的尾逗号： ,} 或 ,] """
-    return re.sub(r",\s*([}\]])", r"\1", s)
+import os
+import random
+import json
+import logging
+import requests
+from typing import Any, Dict, List, Optional
+from openai import OpenAI  # 引入 OpenAI SDK
 
 class ModelAPIWrapper:
     """AI模型API调用包装器：使用 requests 库发请求 + 自动轮询 key + JSON 解析增强"""
@@ -54,7 +28,7 @@ class ModelAPIWrapper:
         self.retry_count = retry_count
         self.configs: Dict[str, Dict[str, Any]] = {
             "qwen": {
-                "base_url": os.environ.get("AI_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions/chat/completions") + '/chat/completions',
+                "base_url": os.environ.get("AI_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completion") + '/chat/completions',
                 "model_id": os.environ.get("OPENAI_MODEL", "qwen-max"),
                 "api_keys": [os.environ.get("OPENAI_API_KEY")],
                 "customized_args": {"max_tokens": 4096},
@@ -62,7 +36,6 @@ class ModelAPIWrapper:
             }
         }
         # print(self.configs)
-        
 
     def _get_config(self, api_type: str) -> Dict[str, Any]:
         if api_type not in self.configs:
@@ -73,10 +46,33 @@ class ModelAPIWrapper:
             raise ValueError(f"{api_type} 的 api_keys 为空")
         return cfg
 
+    def aliChat(self, question: str) -> str:
+        """使用OpenAI接口进行联网搜索"""
+        print("此次使用的模型是{}".format(self.configs["qwen"]["model_id"]))
+        
+        # 使用OpenAI客户端进行联网调用
+        client = OpenAI(
+            api_key=self.configs["qwen"]["api_keys"][0],  # 使用API密钥
+            base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",  # 基础URL
+        )
+        
+        # 发起聊天请求
+        try:
+            completion = client.chat.completions.create(
+                model=self.configs["qwen"]["model_id"],  # 使用的模型ID
+                messages=[
+                    {'role': 'system', 'content': 'You are a helpful assistant.'},
+                    {'role': 'user', 'content': question}
+                ],
+            )
+            return completion.model_dump_json()  # 返回json格式的响应
+        except Exception as e:
+            self.logger.error(f"联网请求失败: {str(e)}")
+            return str(e)
+
     def _request_with_retry(self, url: str, headers: dict, payload: dict) -> dict:
         """手动实现请求并进行重试机制"""
         last_exception = None
-        # print(url)
         for attempt in range(self.retry_count):
             try:
                 response = requests.post(url, headers=headers, json=payload, timeout=self.configs["qwen"]["post_request_kwargs"]["timeout"])
@@ -90,14 +86,12 @@ class ModelAPIWrapper:
         # 如果重试次数耗尽，抛出最后一次异常
         raise last_exception
 
-    def call_text(
-        self,
-        prompt: str,
-        api_type: str = "qwen",
-        history: Optional[List[dict]] = None,
-        system: Optional[str] = None,
-        media: Optional[List] = None,
-    ) -> str:
+    def call_text(self, prompt: str, api_type: str = "qwen") -> str:
+        """调用API并返回文本响应"""
+        if api_type == "qwen":
+            return self.aliChat(prompt)  # 直接使用 aliChat 进行联网搜索
+        
+        # 其他API类型处理
         cfg = self._get_config(api_type)
         keys: List[str] = list(cfg["api_keys"])
         random.shuffle(keys)
@@ -124,27 +118,10 @@ class ModelAPIWrapper:
                 continue
         raise RuntimeError(f"API调用失败({api_type})，已轮询所有key。最后错误: {repr(last_err)}")
 
-    def call_json(
-        self,
-        prompt: str,
-        api_type: str = "qwen",
-        history: Optional[List[dict]] = None,
-        system: Optional[str] = None,
-        media: Optional[List] = None,
-    ) -> Dict[str, Any]:
-        text = self.call_text(prompt, api_type=api_type, history=history, system=system, media=media)
-        cand = _extract_json_candidate(text)
-        cand = _remove_trailing_commas(cand)
-        try:
-            obj = json.loads(cand)
-            return obj if isinstance(obj, dict) else {"data": obj}
-        except json.JSONDecodeError:
-            return {
-                "error": "Response is not valid JSON",
-                "raw_text": text,
-                "json_candidate": cand,
-                "api_type": api_type,
-            }
+    def call_json(self, prompt: str, api_type: str = "qwen") -> Dict[str, Any]:
+        """调用API并返回JSON格式响应"""
+        text = self.call_text(prompt, api_type=api_type)
+        return json.loads(text)
 
     def collect_arena_benchmark_data(self, company: str) -> Dict[str, Any]:
         
