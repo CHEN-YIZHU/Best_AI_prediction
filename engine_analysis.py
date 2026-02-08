@@ -6,38 +6,36 @@ from datetime import datetime
 import pandas as pd
 
 from api_wrapper import ModelAPIWrapper
-from transformers import AutoTokenizer
-from utils import prepare_model, build_sampling_params, extract_first_json_obj, safe_json_dump, safe_format_prompt
+from utils import extract_first_json_obj, safe_json_dump, safe_format_prompt, normalize_score
 
 
 class AICompanyAnalyzer:
     """AI公司综合分析引擎"""
     
     def __init__(self, args):
-        self.local_model_path = args.model_path
-        self.max_model_len = args.max_model_len
-        self.max_tokens = args.max_tokens
-        self.temperature = args.temperature
-        self.top_p = args.top_p
-        
         # Initialize other components
         self.api_wrapper = ModelAPIWrapper()
-        self.tokenizer = AutoTokenizer.from_pretrained(self.local_model_path, trust_remote_code=True)
-        self.llm = prepare_model(self.local_model_path, max_model_len=self.max_model_len)
-        self.sampling_params = build_sampling_params(max_tokens=self.max_tokens, temperature=self.temperature, top_p=self.top_p)
+        
+        # 外部API配置（使用fuwuqi.txt中的配置）
+        self.external_api_config = {
+            "provider": "qwen",
+            "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+            "api_key": args.inference_key,
+            "model": "qwen-max"
+        }
 
         self.logger = logging.getLogger(__name__)
         
         # 主要AI公司列表
         self.target_companies = [
-            "OpenAI", "Google",
-            "Anthropic", "DeepSeek", 
-            "Doubao", "Alibaba(Qwen)", "Meituan",
-            "xAI", "Mistral", "百度"
+            "OpenAI (Chatgpt)", "Google (Gemini)",
+            "Anthropic (Claude)", "DeepSeek", 
+            "字节跳动 (Doubao)", "Alibaba (Qwen)", "Meituan",
+            "xAI", "Mistral", "百度 (文心一言)"
         ]
 
     
-    def analyze_single_company(self, company: str, use_api: bool = True) -> Dict[str, Any]:
+    def analyze_single_company(self, company: str) -> Dict[str, Any]:
         """
         分析单个公司，支持API和本地模型双模式
         """
@@ -46,7 +44,7 @@ class AICompanyAnalyzer:
         analysis_data = {
             "company": company,
             "timestamp": datetime.now().isoformat(),
-            "analysis_method": "api" if use_api else "local",
+            "analysis_method": "api",
             "benchmark_data": {},
             "leadership_analysis": {},
             "risk_assessment": {},
@@ -74,77 +72,108 @@ class AICompanyAnalyzer:
     
     def analyze_with_local_llm(self, analysis_data: Dict[str, Any]) -> float:
         """
-        使用 vLLM 对 API 数据做综合分析并返回 0~1 的得分
+        使用外部API（通义千问）对API数据做综合分析并返回0~1的得分
         """
         company = analysis_data["company"]
-
+        
+        # 构建LLM提示词
         template = """你是一个专业的AI投资分析师，你需要预测截至在{time}前
-    Chatbot Arena 榜单上第一的 AI 模型更可能来自哪个公司。
+Chatbot Arena榜单上第一的AI模型更可能来自哪个公司。
 
-    请基于以下四个维度的数据，对 {company} 进行综合评分（0-100分）：
+请基于以下四个维度的数据，对 {company} 进行综合评分（0-100分）：
 
-    基准表现数据:
-    {benchmark_data}
+基准表现数据:
+{benchmark_data}
 
-    领导地位分析:
-    {leadership_data}
+领导地位分析:
+{leadership_data}
 
-    风险评估:
-    {risk_data}
+风险评估:
+{risk_data}
 
-    商业价值分析:
-    {business_data}
+商业价值分析:
+{business_data}
 
-    评分标准:
-    1. 技术实力和基准测试表现 (40%)
-    2. 市场竞争力和领导者地位 (30%)
-    3. 商业价值和盈利能力 (20%)
-    4. 风险管控和合规性 (10%)
+评分标准:
+1. 技术实力和基准测试表现 (40%)
+2. 市场竞争力和领导者地位 (30%)
+3. 商业价值和盈利能力 (20%)
+4. 风险管控和合规性 (10%)
 
-    注意：
-    - 请只输出一个 JSON 对象
-    - 不要输出解释性文字
-    - 不要使用 ```json``` 代码块
+注意：
+- 请只输出一个JSON对象
+- 不要输出解释性文字
+- 不要使用```json```代码块
 
-    JSON 格式：
-    {{
-    "score": 0-100,
-    "reasoning": "评分理由",
-    "strengths": "主要优势",
-    "weaknesses": "潜在风险"
-    }}
-    """
+JSON格式：
+{{
+"score": 0-100,
+"reasoning": "评分理由",
+"strengths": "主要优势",
+"weaknesses": "潜在风险"
+}}
+"""
 
-        prompt = safe_format_prompt(
-            company=company,
-            analysis_data=analysis_data,
-            template=template,
-            benchmark_data=safe_json_dump(analysis_data["benchmark_data"]),
-            leadership_data=safe_json_dump(analysis_data["leadership_analysis"]),
-            risk_data=safe_json_dump(analysis_data["risk_assessment"]),
-            business_data=safe_json_dump(analysis_data["business_analysis"]),
-        )
+        prompt = f"""你是一个专业的AI投资分析师，需要基于以下数据对{company}进行综合评分（0-100分）：
+
+基准表现数据:
+{safe_json_dump(analysis_data.get("benchmark_data", {}))}
+
+领导地位分析:
+{safe_json_dump(analysis_data.get("leadership_analysis", {}))}
+
+风险评估:
+{safe_json_dump(analysis_data.get("risk_assessment", {}))}
+
+商业价值分析:
+{safe_json_dump(analysis_data.get("business_analysis", {}))}
+
+请严格按照以下JSON格式输出，只输出JSON对象，不要有其他文字：
+{{
+"score": 分数值（0-100）,
+"reasoning": "评分理由",
+"strengths": "主要优势",
+"weaknesses": "潜在风险"
+}}"""
 
         try:
-            outputs = self.llm.generate([prompt], self.sampling_params)
+            # 使用外部API调用
+            from openai import OpenAI
+            
+            client = OpenAI(
+                base_url=self.external_api_config["base_url"],
+                api_key=self.external_api_config["api_key"]
+            )
+            
+            response = client.chat.completions.create(
+                model=self.external_api_config["model"],
+                messages=[
+                    {
+                        "role": "system", 
+                        "content": "你是一个专业的AI投资分析师，需要基于提供的商业数据对AI公司进行评分。请严格按要求格式输出JSON。"
+                    },
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
+                ],
+                temperature=0.3,
+                max_tokens=2000
+            )
+            
+            text = response.choices[0].message.content
+            analysis_data["external_api_raw_output"] = text
 
-            # vLLM 标准取文本方式
-            if hasattr(outputs[0], "outputs"):
-                text = outputs[0].outputs[0].text
-            else:
-                text = str(outputs[0])
-
-            analysis_data["llm_raw_output"] = text
-
+            # 提取JSON对象
             obj = extract_first_json_obj(text)
             analysis_data["llm_analysis"] = obj
             analysis_data["llm_reasoning"] = obj.get("reasoning", "")
 
-            return normalize_score(obj.get("score"))
+            return normalize_score(obj.get("score", 0))
 
         except Exception as e:
-            self.logger.error(f"vLLM分析失败，回退到规则评分: {str(e)}")
-            analysis_data["llm_error"] = str(e)
+            self.logger.error(f"外部API分析失败: {str(e)}，回退到规则评分")
+            analysis_data["external_api_error"] = str(e)
             return float(self.calculate_comprehensive_score(analysis_data) or 0.0)
 
 
@@ -252,18 +281,18 @@ class AICompanyAnalyzer:
         
         return max(score, 0.0) / 100.0
     
-    def analyze_all_companies(self, use_api: bool = True, max_workers: int = 3) -> List[Dict[str, Any]]:
+    def analyze_all_companies(self, max_workers: int = 3) -> List[Dict[str, Any]]:
         """
         并行分析所有目标公司
         """
-        self.logger.info(f"开始分析所有{len(self.target_companies)}家公司，使用{'API' if use_api else '本地模型'}")
+        self.logger.info(f"开始分析所有{len(self.target_companies)}家公司")
         
         results = []
         
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             # 提交所有任务
             future_to_company = {
-                executor.submit(self.analyze_single_company, company, use_api): company
+                executor.submit(self.analyze_single_company, company): company
                 for company in self.target_companies
             }
             
@@ -319,6 +348,6 @@ class AICompanyAnalyzer:
                 for i, result in enumerate(valid_results[:10])  # 前10名
             ],
             "detailed_analysis": valid_results
-        } 我的目的是预测未来一个月chatbot-arena榜单上第一的AI模型来自于哪个公司。请改进local llm 分析的prompt。并指出这段代码有什么问题。用中文回答
-        
+        } 
+
         return report
