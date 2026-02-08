@@ -14,7 +14,7 @@
 ## 快速启动API服务
 
 ```bash
-cd AI_predict
+cd Best_AI_prediction
 bash scripts/start_api.sh
 ```
 
